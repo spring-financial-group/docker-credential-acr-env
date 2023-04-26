@@ -1,0 +1,107 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  creationTimestamp: null
+  name: release
+spec:
+  pipelineSpec:
+    tasks:
+    - name: from-build-pack
+      resources: {}
+      taskSpec:
+        metadata: {}
+        stepTemplate:
+          image: uses:jenkins-x/jx3-pipeline-catalog/tasks/go/release.yaml@versionStream
+          name: ""
+          resources:
+            # override limits for all containers here
+            limits: {}
+          workingDir: /workspace/source
+          volumeMounts:
+            - mountPath: /oss-docker-config
+              name: oss-docker-config
+        steps:
+        - image: uses:jenkins-x/jx3-pipeline-catalog/tasks/git-clone/git-clone.yaml@versionStream
+          name: ""
+          resources: {}
+        - image: ghcr.io/jenkins-x/jx-release-version:2.5.0
+          name: next-version
+          resources: {}
+          script: |
+            #!/usr/bin/env sh
+            jx-release-version > VERSION
+        - name: jx-variables
+          resources:
+            # override requests for the pod here
+            requests:
+              cpu: 400m
+              memory: 600Mi
+        - image: ghcr.io/jenkins-x/jx-boot:3.2.197
+          name: override-variables
+          resources: {}
+          script: |
+            #!/usr/bin/env sh
+            sed -i 's/jx3mqubebuild/mqubeoss/g' .jx/variables.sh
+        - image: uses:spring-financial-group/DevOps/pipelines/golang-lint.yaml@main
+          name: ""
+          resources: {}
+        - image: golang:1.18
+          name: build-make-build
+          resources: {}
+          script: |
+            #!/bin/sh
+            make build release linux win darwin
+        - image: ghcr.io/jenkins-x/jx-changelog:0.0.47
+          name: promote-changelog
+          script: |
+            #!/usr/bin/env sh
+            source .jx/variables.sh
+
+            if [ -d "charts/$REPO_NAME" ]; then
+            sed -i -e "s/^version:.*/version: $VERSION/" ./charts/$REPO_NAME/Chart.yaml
+            sed -i -e "s/tag:.*/tag: $VERSION/" ./charts/$REPO_NAME/values.yaml;
+            else echo no charts; fi
+
+            git commit -a -m "chore: release $VERSION" --allow-empty
+            git tag -fa v$VERSION -m "Release version $VERSION"
+            git push origin v$VERSION
+
+            jx changelog create --version v${VERSION}
+        - image: ghcr.io/jenkins-x/jx-boot:3.2.197
+          name: export-token
+          resources: {}
+          script: |
+            #!/usr/bin/env sh
+            echo "export GH_TOKEN=\"$(kubectl get secret peacock -n jx-staging -o jsonpath="{.data['git-token']}" | base64 -d)\"" >> .jx/variables.sh
+        - image: tomhobson/github-cli:latest
+          name: push-release
+          script: |
+            #!/usr/bin/env bash
+            source .jx/variables.sh
+
+            echo "uploading to release v$VERSION"
+            gh release upload v$VERSION ./build/linux/peacock
+            gh release upload v$VERSION ./build/win/peacock-windows-amd64.exe
+            mv ./build/darwin/peacock ./build/darwin/peacock-darwin
+            gh release upload v$VERSION ./build/darwin/peacock-darwin
+        - image: gcr.io/kaniko-project/executor:v1.9.1-debug
+          name: build-container-build
+          resources: {}
+          script: |
+            #!/busybox/sh
+            source .jx/variables.sh
+            cp /oss-docker-config/config.json /kaniko/.docker/config.json
+            /kaniko/executor $KANIKO_FLAGS --context=/workspace/source --dockerfile=${DOCKERFILE_PATH:-Dockerfile} --destination=$PUSH_CONTAINER_REGISTRY/$DOCKER_REGISTRY_ORG/$APP_NAME:$VERSION --destination=$PUSH_CONTAINER_REGISTRY/$DOCKER_REGISTRY_ORG/$APP_NAME:latest
+        - image: uses:jenkins-x/jx3-pipeline-catalog/tasks/updatebot/release.yaml@versionStream
+          resources: {}
+        volumes:
+          - name: oss-docker-config
+            secret:
+              secretName: tekton-oss-container-registry-auth
+              items:
+                - key: .dockerconfigjson
+                  path: config.json
+  podTemplate: {}
+  serviceAccountName: tekton-bot
+  timeout: 12h0m0s
+status: {}

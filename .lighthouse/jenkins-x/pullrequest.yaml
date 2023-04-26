@@ -1,0 +1,64 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  name: pullrequest
+spec:
+  pipelineSpec:
+    tasks:
+    - name: from-build-pack
+      resources: {}
+      taskSpec:
+        metadata: {}
+        stepTemplate:
+          image: uses:jenkins-x/jx3-pipeline-catalog/tasks/go/pullrequest.yaml@versionStream
+          name: ""
+          resources:
+            # override limits for all containers here
+            limits: {}
+          workingDir: /workspace/source
+          volumeMounts:
+            - mountPath: /oss-docker-config
+              name: oss-docker-config
+        steps:
+        - image: uses:jenkins-x/jx3-pipeline-catalog/tasks/git-clone/git-clone-pr.yaml@versionStream
+          name: ""
+          resources: {}
+        - name: jx-variables
+          resources:
+            # override requests for the pod here
+            requests:
+              cpu: 400m
+              memory: 600Mi
+        - image: ghcr.io/jenkins-x/jx-boot:3.2.197
+          name: override-variables
+          resources: {}
+          script: |
+            #!/usr/bin/env sh
+            sed -i 's/jx3mqubebuild/mqubeoss/g' .jx/variables.sh
+        - image: golang:1.18
+          name: build-make-build
+          resources: {}
+          script: |
+            #!/bin/sh
+            make build
+        - image: uses:spring-financial-group/DevOps/pipelines/sonar-scanner-pr.yaml@main
+          name: ""
+        - image: gcr.io/kaniko-project/executor:v1.9.1-debug
+          name: build-container-build
+          resources: {}
+          script: |
+            #!/busybox/sh
+            source .jx/variables.sh
+            cp /oss-docker-config/config.json /kaniko/.docker/config.json
+            /kaniko/executor $KANIKO_FLAGS --context=/workspace/source --dockerfile=${DOCKERFILE_PATH:-Dockerfile} --destination=$PUSH_CONTAINER_REGISTRY/$DOCKER_REGISTRY_ORG/$APP_NAME:$VERSION
+        volumes:
+          - name: oss-docker-config
+            secret:
+              secretName: tekton-oss-container-registry-auth
+              items:
+                - key: .dockerconfigjson
+                  path: config.json
+  podTemplate: {}
+  serviceAccountName: tekton-bot
+  timeout: 1h0m0s
+status: {}

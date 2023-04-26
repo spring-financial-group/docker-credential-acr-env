@@ -1,4 +1,4 @@
-module github.com/chrismellard/docker-credential-acr-env
+module github.com/spring-financial-group/docker-credential-acr-env
 
 go 1.18
 
