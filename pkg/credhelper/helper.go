@@ -58,10 +58,7 @@ func isACRRegistry(input string) bool {
 		return true
 	}
 	matches := acrRE.FindStringSubmatch(serverURL.Hostname())
-	if len(matches) == 0 {
-		return false
-	}
-	return true
+	return len(matches) != 0
 }
 
 func (a ACRCredHelper) Get(serverURL string) (string, string, error) {
