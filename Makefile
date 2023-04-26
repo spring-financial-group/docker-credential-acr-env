@@ -4,8 +4,7 @@ BUILD_TARGET = build
 ORG := spring-financial-group
 ORG_REPO := $(ORG)/$(NAME)
 ROOT_PACKAGE := github.com/$(ORG_REPO)
-MAIN_SRC_FILE=cmd/api/main.go
-CLI_SRC_FILE=cmd/main.go
+SRC_FILE=main.go
 GO := GO111MODULE=on go
 GO_NOMOD :=GO111MODULE=off go
 REV := $(shell git rev-parse --short HEAD 2> /dev/null || echo 'unknown')
@@ -82,7 +81,7 @@ print-version: ## Print version
 	@echo $(VERSION)
 
 build: $(GO_DEPENDENCIES) ## Build docker-credential-acr-env binary for current OS
-	CGO_ENABLED=$(CGO_ENABLED) $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/$(BINARY_NAME) $(MAIN_SRC_FILE)
+	CGO_ENABLED=$(CGO_ENABLED) $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/$(BINARY_NAME) $(SRC_FILE)
 
 build-all: $(GO_DEPENDENCIES) build make-reports-dir ## Build all files - runtime, all tests etc.
 	CGO_ENABLED=$(CGO_ENABLED) $(GOTEST) -run=nope -tags=integration -failfast -short ./... $(BUILDFLAGS)
@@ -109,26 +108,26 @@ test-report-html: make-reports-dir get-test-deps test-coverage ## Create the tes
 	@gocov convert $(COVER_OUT) | gocov-html > $(REPORTS_DIR)/cover.html && open $(REPORTS_DIR)/cover.html
 
 install: $(GO_DEPENDENCIES) ## Install the binary
-	GOBIN=${GOPATH}/bin $(GO) install $(BUILDFLAGS) $(MAIN_SRC_FILE)
+	GOBIN=${GOPATH}/bin $(GO) install $(BUILDFLAGS) $(SRC_FILE)
 	mv ${GOPATH}/bin/main ${GOPATH}/bin/$(BINARY_NAME)
 
 linux: ## Build for Linux
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=amd64 $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/linux/$(BINARY_NAME) $(MAIN_SRC_FILE)
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=amd64 $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/linux/$(BINARY_NAME) $(SRC_FILE)
 	chmod +x build/linux/$(BINARY_NAME)
 
 arm: ## Build for ARM
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=arm $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/arm/$(BINARY_NAME) $(MAIN_SRC_FILE)
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=arm $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/arm/$(BINARY_NAME) $(SRC_FILE)
 	chmod +x build/arm/$(BINARY_NAME)
 
 android: ## Build for ARM
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=android GOARCH=arm $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/android/$(BINARY_NAME) $(MAIN_SRC_FILE)
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=android GOARCH=arm $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/android/$(BINARY_NAME) $(SRC_FILE)
 	chmod +x build/android/$(BINARY_NAME)
 
 win: ## Build for Windows
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=windows GOARCH=amd64 $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/win/$(BINARY_NAME)-windows-amd64.exe $(MAIN_SRC_FILE)
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=windows GOARCH=amd64 $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/win/$(BINARY_NAME)-windows-amd64.exe $(SRC_FILE)
 
 darwin: ## Build for OSX
-	CGO_ENABLED=$(CGO_ENABLED) GOOS=darwin GOARCH=amd64 $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/darwin/$(BINARY_NAME) $(MAIN_SRC_FILE)
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=darwin GOARCH=amd64 $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/darwin/$(BINARY_NAME) $(SRC_FILE)
 	chmod +x build/darwin/$(BINARY_NAME)
 
 .PHONY: release
