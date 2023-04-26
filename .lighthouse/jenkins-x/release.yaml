@@ -80,10 +80,10 @@ spec:
             source .jx/variables.sh
 
             echo "uploading to release v$VERSION"
-            gh release upload v$VERSION ./build/linux/peacock
-            gh release upload v$VERSION ./build/win/peacock-windows-amd64.exe
-            mv ./build/darwin/peacock ./build/darwin/peacock-darwin
-            gh release upload v$VERSION ./build/darwin/peacock-darwin
+            gh release upload v$VERSION ./build/linux/docker-credential-acr-env
+            gh release upload v$VERSION ./build/win/docker-credential-acr-env-windows-amd64.exe
+            mv ./build/darwin/peacock ./build/darwin/docker-credential-acr-env-darwin
+            gh release upload v$VERSION ./build/darwin/docker-credential-acr-env-darwin
         - image: gcr.io/kaniko-project/executor:v1.9.1-debug
           name: build-container-build
           resources: {}
