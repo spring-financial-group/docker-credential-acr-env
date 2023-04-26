@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -22,9 +22,9 @@ import (
 	"regexp"
 
 	"github.com/Azure/go-autorest/autorest/azure/auth"
-	"github.com/chrismellard/docker-credential-acr-env/pkg/registry"
-	"github.com/chrismellard/docker-credential-acr-env/pkg/token"
 	"github.com/docker/docker-credential-helpers/credentials"
+	"github.com/spring-financial-group/docker-credential-acr-env/pkg/registry"
+	"github.com/spring-financial-group/docker-credential-acr-env/pkg/token"
 )
 
 var acrRE = regexp.MustCompile(`.*\.azurecr\.io|.*\.azurecr\.cn|.*\.azurecr\.de|.*\.azurecr\.us`)
@@ -58,10 +58,7 @@ func isACRRegistry(input string) bool {
 		return true
 	}
 	matches := acrRE.FindStringSubmatch(serverURL.Hostname())
-	if len(matches) == 0 {
-		return false
-	}
-	return true
+	return len(matches) != 0
 }
 
 func (a ACRCredHelper) Get(serverURL string) (string, string, error) {
