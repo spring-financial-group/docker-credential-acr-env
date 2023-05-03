@@ -80,7 +80,7 @@ get-test-deps: ## Install test dependencies
 print-version: ## Print version
 	@echo $(VERSION)
 
-build: $(GO_DEPENDENCIES) ## Build docker-credential-acr-env binary for current OS
+build: $(GO_DEPENDENCIES) clean ## Build docker-credential-acr-env api binary for current OS
 	CGO_ENABLED=$(CGO_ENABLED) $(GO) $(BUILD_TARGET) $(BUILDFLAGS) -o build/$(BINARY_NAME) $(SRC_FILE)
 
 build-all: $(GO_DEPENDENCIES) build make-reports-dir ## Build all files - runtime, all tests etc.
@@ -107,7 +107,7 @@ test-report: make-reports-dir get-test-deps test-coverage ## Create the test rep
 test-report-html: make-reports-dir get-test-deps test-coverage ## Create the test report in HTML format
 	@gocov convert $(COVER_OUT) | gocov-html > $(REPORTS_DIR)/cover.html && open $(REPORTS_DIR)/cover.html
 
-install: $(GO_DEPENDENCIES) ## Install the binary
+install: $(GO_DEPENDENCIES) ## Install the CLI binary
 	GOBIN=${GOPATH}/bin $(GO) install $(BUILDFLAGS) $(SRC_FILE)
 	mv ${GOPATH}/bin/main ${GOPATH}/bin/$(BINARY_NAME)
 
@@ -161,8 +161,11 @@ importfmt: get-fmt-deps
 	@echo "Formatting the imports..."
 	goimports -w $(GO_DEPENDENCIES)
 
-lint: ## Lints the code with golangci-lint
-	golangci-lint run
+.PHONY: lint
+lint: ## Lint the code
+	./hack/gofmt.sh
+	./hack/linter.sh
+	./hack/generate.sh
 
 .PHONY: all
 all: fmt build test lint
@@ -176,3 +179,4 @@ docs: bin/docs ## update docs
 	@./bin/docs --target=./docs/cmd
 	@./bin/docs --target=./docs/man/man1 --kind=man
 	@rm -f ./bin/docs
+
