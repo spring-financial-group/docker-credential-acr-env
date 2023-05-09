@@ -39,7 +39,6 @@ func GetServicePrincipalTokenFromEnvironment() (*adal.ServicePrincipalToken, aut
 
 // getServicePrincipalToken retrieves an Azure AD OAuth2 token from the supplied environment settings for the specified resource
 func getServicePrincipalToken(settings auth.EnvironmentSettings, resource string) (*adal.ServicePrincipalToken, error) {
-
 	//1.Client Credentials
 	if _, e := settings.GetClientCredentials(); e == nil {
 		clientCredentialsConfig, err := settings.GetClientCredentials()
