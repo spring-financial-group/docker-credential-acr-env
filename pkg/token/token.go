@@ -24,11 +24,13 @@ import (
 )
 
 func GetServicePrincipalTokenFromEnvironment() (*adal.ServicePrincipalToken, auth.EnvironmentSettings, error) {
+	fmt.Println("Getting settings")
 	settings, err := auth.GetSettingsFromEnvironment()
 	if err != nil {
 		return &adal.ServicePrincipalToken{}, auth.EnvironmentSettings{}, fmt.Errorf("failed to get auth settings from environment - %w", err)
 	}
 
+	fmt.Println("Getting service principal token")
 	spToken, err := getServicePrincipalToken(settings, settings.Environment.ResourceManagerEndpoint)
 	if err != nil {
 		return &adal.ServicePrincipalToken{}, auth.EnvironmentSettings{}, fmt.Errorf("failed to initialise sp token config %w", err)
@@ -39,7 +41,7 @@ func GetServicePrincipalTokenFromEnvironment() (*adal.ServicePrincipalToken, aut
 
 // getServicePrincipalToken retrieves an Azure AD OAuth2 token from the supplied environment settings for the specified resource
 func getServicePrincipalToken(settings auth.EnvironmentSettings, resource string) (*adal.ServicePrincipalToken, error) {
-
+	fmt.Println("Trying to get creds from settings")
 	//1.Client Credentials
 	if _, e := settings.GetClientCredentials(); e == nil {
 		clientCredentialsConfig, err := settings.GetClientCredentials()
@@ -53,16 +55,19 @@ func getServicePrincipalToken(settings auth.EnvironmentSettings, resource string
 		return adal.NewServicePrincipalToken(*oAuthConfig, clientCredentialsConfig.ClientID, clientCredentialsConfig.ClientSecret, clientCredentialsConfig.Resource)
 	}
 
+	fmt.Println("Trying to get creds from client certificate")
 	//2. Client Certificate
 	if _, e := settings.GetClientCertificate(); e == nil {
 		return &adal.ServicePrincipalToken{}, fmt.Errorf("authentication method currently unsupported")
 	}
 
+	fmt.Println("Trying to get creds from username password")
 	//3. Username Password
 	if _, e := settings.GetUsernamePassword(); e == nil {
 		return &adal.ServicePrincipalToken{}, fmt.Errorf("authentication method currently unsupported")
 	}
 
+	fmt.Println("Trying to get creds from jwt")
 	// federated OIDC JWT assertion
 	jwt, err := jwtLookup()
 	if err == nil {
@@ -83,6 +88,7 @@ func getServicePrincipalToken(settings auth.EnvironmentSettings, resource string
 		return adal.NewServicePrincipalTokenFromFederatedToken(*oAuthConfig, clientID, *jwt, resource)
 	}
 
+	fmt.Println("Trying to get creds from managed identity")
 	// 4. MSI
 	return adal.NewServicePrincipalTokenFromManagedIdentity(resource, &adal.ManagedIdentityOptions{
 		ClientID: os.Getenv("AZURE_CLIENT_ID"),
