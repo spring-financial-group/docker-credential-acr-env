@@ -41,7 +41,7 @@ spec:
           script: |
             #!/bin/sh
             make build
-        - image: uses:spring-financial-group/DevOps/pipelines/sonar-scanner-pr.yaml@main
+        - image: uses:spring-financial-group/mqube-pipeline-catalog/tasks/sonar/sonar-scanner-pr.yaml@main
           name: ""
         - image: gcr.io/kaniko-project/executor:v1.9.1-debug
           name: build-container-build
