@@ -16,49 +16,67 @@ limitations under the License.
 package credhelper
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
-	"regexp"
+	"strings"
+	"time"
 
-	"github.com/Azure/go-autorest/autorest/azure/auth"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/containers/azcontainerregistry"
 	"github.com/docker/docker-credential-helpers/credentials"
+	"github.com/spring-financial-group/docker-credential-acr-env/pkg/azcloud"
 	"github.com/spring-financial-group/docker-credential-acr-env/pkg/registry"
 	"github.com/spring-financial-group/docker-credential-acr-env/pkg/token"
 )
 
-var acrRE = regexp.MustCompile(`.*\.azurecr\.io|.*\.azurecr\.cn|.*\.azurecr\.de|.*\.azurecr\.us`)
+var acrSuffixes = []string{".azurecr.io", ".azurecr.cn", ".azurecr.us"}
 
 const (
 	mcrHostname   = "mcr.microsoft.com"
 	tokenUsername = "<token>"
+
+	// AAD token acquisition and the registry token exchange share this deadline
+	defaultTimeout = 30 * time.Second
 )
 
 type ACRCredHelper struct {
+	tokenProvider   token.TokenProvider
+	cloud           cloud.Configuration
+	exchangeOptions *azcontainerregistry.AuthenticationClientOptions
 }
 
-func NewACRCredentialsHelper() credentials.Helper {
-	return &ACRCredHelper{}
+func NewACRCredentialsHelper() (credentials.Helper, error) {
+	cfg, err := azcloud.FromEnvironment()
+	if err != nil {
+		return nil, err
+	}
+	tp, err := token.NewDefaultTokenProvider(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azure credential: %w", err)
+	}
+	return &ACRCredHelper{tokenProvider: tp, cloud: cfg}, nil
 }
 
-func (a ACRCredHelper) Add(_ *credentials.Credentials) error {
-	return errors.New("list is unimplemented")
-}
-
-func (a ACRCredHelper) Delete(_ string) error {
-	return errors.New("list is unimplemented")
-}
-
+// isACRRegistry reports whether input names an Azure Container Registry
 func isACRRegistry(input string) bool {
 	serverURL, err := url.Parse("https://" + input)
 	if err != nil {
 		return false
 	}
-	if serverURL.Hostname() == mcrHostname {
+	host := strings.ToLower(serverURL.Hostname())
+	if host == mcrHostname {
 		return true
 	}
-	matches := acrRE.FindStringSubmatch(serverURL.Hostname())
-	return len(matches) != 0
+	for _, suffix := range acrSuffixes {
+		if strings.HasSuffix(host, suffix) {
+			return true
+		}
+	}
+	return false
 }
 
 func (a ACRCredHelper) Get(serverURL string) (string, string, error) {
@@ -66,15 +84,51 @@ func (a ACRCredHelper) Get(serverURL string) (string, string, error) {
 		return "", "", errors.New("serverURL does not refer to Azure Container Registry")
 	}
 
-	spToken, settings, err := token.GetServicePrincipalTokenFromEnvironment()
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	scope, err := azcloud.ACRTokenScope(a.cloud)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to acquire sp token %w", err)
+		return "", "", err
 	}
-	refreshToken, err := registry.GetRegistryRefreshTokenFromAADExchange(serverURL, spToken, settings.Values[auth.TenantID])
+
+	tok, err := token.GetAADAccessToken(ctx, a.tokenProvider, scope)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to acquire refresh token %w", err)
+		return "", "", fmt.Errorf("failed to acquire AAD token: %w", err)
 	}
+
+	exchangeOpts := a.exchangeOptions
+	if exchangeOpts == nil {
+		exchangeOpts = exchangeClientOptions(a.cloud)
+	}
+
+	refreshToken, err := registry.GetRegistryRefreshTokenFromAADExchange(ctx, serverURL, tok.AccessToken, tok.TenantID, exchangeOpts)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to acquire refresh token: %w", err)
+	}
+
 	return tokenUsername, refreshToken, nil
+}
+
+// exchangeClientOptions returns production options for the registry exchange client
+func exchangeClientOptions(cfg cloud.Configuration) *azcontainerregistry.AuthenticationClientOptions {
+	return &azcontainerregistry.AuthenticationClientOptions{
+		ClientOptions: azcore.ClientOptions{
+			Cloud: cfg,
+			Retry: policy.RetryOptions{
+				MaxRetries:    2,
+				MaxRetryDelay: 5 * time.Second,
+			},
+		},
+	}
+}
+
+func (a ACRCredHelper) Add(_ *credentials.Credentials) error {
+	return errors.New("add is unimplemented")
+}
+
+func (a ACRCredHelper) Delete(_ string) error {
+	return errors.New("delete is unimplemented")
 }
 
 func (a ACRCredHelper) List() (map[string]string, error) {

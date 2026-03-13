@@ -16,20 +16,39 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
+	"io"
+	"os"
+
 	"github.com/docker/docker-credential-helpers/credentials"
 	"github.com/spf13/cobra"
 	"github.com/spring-financial-group/docker-credential-acr-env/pkg/credhelper"
 )
 
-// getCmd represents the get command
-var getCmd = &cobra.Command{
-	Use:   "get",
-	Short: "for the server specified via stdin, return the stored credentials via stdout",
-	Run: func(cmd *cobra.Command, args []string) {
-		credentials.Serve(credhelper.NewACRCredentialsHelper())
-	},
+func newGetCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "get",
+		Short: "for the server specified via stdin, return the stored credentials via stdout",
+		Run: func(cmd *cobra.Command, args []string) {
+			helper, err := credhelper.NewACRCredentialsHelper()
+			if err != nil {
+				// The docker credential protocol reads errors from stdout
+				fmt.Fprintln(os.Stdout, err)
+				os.Exit(1)
+			}
+			if err := serveGet(helper, os.Stdin, os.Stdout); err != nil {
+				os.Exit(1)
+			}
+		},
+	}
 }
 
-func init() {
-	rootCmd.AddCommand(getCmd)
+// serveGet runs the get action over the given streams
+// Errors are written to out because the docker credential protocol reads them from stdout
+func serveGet(helper credentials.Helper, in io.Reader, out io.Writer) error {
+	err := credentials.HandleCommand(helper, credentials.ActionGet, in, out)
+	if err != nil {
+		fmt.Fprintln(out, err)
+	}
+	return err
 }

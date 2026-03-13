@@ -6,11 +6,10 @@ ORG_REPO := $(ORG)/$(NAME)
 ROOT_PACKAGE := github.com/$(ORG_REPO)
 SRC_FILE=main.go
 GO := GO111MODULE=on go
-GO_NOMOD :=GO111MODULE=off go
 REV := $(shell git rev-parse --short HEAD 2> /dev/null || echo 'unknown')
 RELEASE_ORG_REPO := $(ORG_REPO)
 ROOT_PACKAGE := github.com/$(ORG_REPO)
-GO_VERSION := 1.18
+GO_VERSION := 1.26.4
 GO_DEPENDENCIES := $(call rwildcard,pkg/,*.go) $(call rwildcard,cmd/,*.go)
 
 
@@ -27,17 +26,10 @@ GOTEST := $(GO) test
 VERSION ?= $(shell echo "$$(git for-each-ref refs/tags/ --count=1 --sort=-version:refname --format='%(refname:short)' 2>/dev/null)-dev+$(REV)" | sed 's/^v//')
 
 # Build flags for setting build-specific configuration at build time - defaults to empty
-#BUILD_TIME_CONFIG_FLAGS ?= ""
+BUILD_TIME_CONFIG_FLAGS ?=
 
 # Full build flags used when building binaries. Not used for test compilation/execution.
-BUILDFLAGS :=  -ldflags \
-  " -X $(ROOT_PACKAGE)/pkg/cmd/version.Version=$(VERSION)\
-		-X github.com/spring-financial-group/docker-credential-acr-env/pkg/cmd/version.Version=$(VERSION)\
-		-X $(ROOT_PACKAGE)/pkg/cmd/version.Revision='$(REV)'\
-		-X $(ROOT_PACKAGE)/pkg/cmd/version.Branch='$(BRANCH)'\
-		-X $(ROOT_PACKAGE)/pkg/cmd/version.BuildDate='$(BUILD_DATE)'\
-		-X $(ROOT_PACKAGE)/pkg/cmd/version.GoVersion='$(GO_VERSION)'\
-		$(BUILD_TIME_CONFIG_FLAGS)"
+BUILDFLAGS := $(BUILD_TIME_CONFIG_FLAGS)
 
 # Some tests expect default values for version.*, so just use the config package values there.
 TEST_BUILDFLAGS :=  -ldflags "$(BUILD_TIME_CONFIG_FLAGS)"
@@ -73,9 +65,6 @@ help:
 
 full: check ## Build and run the tests
 check: build test ## Build and run the tests
-get-test-deps: ## Install test dependencies
-	$(GO_NOMOD) get github.com/axw/gocov/gocov
-	$(GO_NOMOD) get -u gopkg.in/matm/v1/gocov-html
 
 print-version: ## Print version
 	@echo $(VERSION)
@@ -101,11 +90,11 @@ test: ## Run tests with the "unit" build tag
 test-coverage : make-reports-dir ## Run tests and coverage for all tests with the "unit" build tag
 	CGO_ENABLED=$(CGO_ENABLED) $(GOTEST) --tags=unit $(COVERFLAGS) -failfast -short ./... $(TEST_BUILDFLAGS)
 
-test-report: make-reports-dir get-test-deps test-coverage ## Create the test report
-	@gocov convert $(COVER_OUT) | gocov report
+test-report: make-reports-dir test-coverage ## Create the test report
+	@$(GO) tool cover -func=$(COVER_OUT)
 
-test-report-html: make-reports-dir get-test-deps test-coverage ## Create the test report in HTML format
-	@gocov convert $(COVER_OUT) | gocov-html > $(REPORTS_DIR)/cover.html && open $(REPORTS_DIR)/cover.html
+test-report-html: make-reports-dir test-coverage ## Create the test report in HTML format
+	@$(GO) tool cover -html=$(COVER_OUT) -o $(REPORTS_DIR)/cover.html && open $(REPORTS_DIR)/cover.html
 
 install: $(GO_DEPENDENCIES) ## Install the CLI binary
 	GOBIN=${GOPATH}/bin $(GO) install $(BUILDFLAGS) $(SRC_FILE)
@@ -144,7 +133,7 @@ clean: ## Clean the generated artifacts
 	rm -rf build release dist
 
 get-fmt-deps: ## Install test dependencies
-	$(GO_NOMOD) get golang.org/x/tools/cmd/goimports
+	$(GO) install golang.org/x/tools/cmd/goimports@latest
 
 .PHONY: fmt
 fmt: importfmt ## Format the code
@@ -162,10 +151,8 @@ importfmt: get-fmt-deps
 	goimports -w $(GO_DEPENDENCIES)
 
 .PHONY: lint
-lint: ## Lint the code
-	./hack/gofmt.sh
-	./hack/linter.sh
-	./hack/generate.sh
+lint: ## Lints the code with golangci-lint
+	golangci-lint run
 
 .PHONY: all
 all: fmt build test lint
