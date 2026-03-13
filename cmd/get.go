@@ -21,15 +21,12 @@ import (
 	"github.com/spring-financial-group/docker-credential-acr-env/pkg/credhelper"
 )
 
-// getCmd represents the get command
-var getCmd = &cobra.Command{
-	Use:   "get",
-	Short: "for the server specified via stdin, return the stored credentials via stdout",
-	Run: func(cmd *cobra.Command, args []string) {
-		credentials.Serve(credhelper.NewACRCredentialsHelper())
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(getCmd)
+func newGetCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "get",
+		Short: "for the server specified via stdin, return the stored credentials via stdout",
+		Run: func(cmd *cobra.Command, args []string) {
+			credentials.Serve(credhelper.NewACRCredentialsHelper())
+		},
+	}
 }

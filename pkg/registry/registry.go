@@ -17,6 +17,7 @@ package registry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -53,7 +54,7 @@ func GetRegistryRefreshTokenFromAADExchange(serverURL string, accessToken string
 	}
 
 	if resp.ACRRefreshToken.RefreshToken == nil {
-		return "", fmt.Errorf("no refresh token returned by registry")
+		return "", errors.New("no refresh token returned by registry")
 	}
 
 	return *resp.ACRRefreshToken.RefreshToken, nil
