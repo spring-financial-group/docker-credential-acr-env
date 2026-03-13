@@ -20,24 +20,26 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 )
 
-// AADAccessTokenResponse wraps an AAD access token and tenant info
 type AADAccessTokenResponse struct {
 	AccessToken string
 	TenantID    string
 }
 
-// GetAADAccessToken retrieves an access token for ACR using the default chain.
-func GetAADAccessToken(ctx context.Context) (AADAccessTokenResponse, error) {
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
-	if err != nil {
-		return AADAccessTokenResponse{}, fmt.Errorf("failed to create Azure credential: %w", err)
-	}
+type TokenProvider interface {
+	GetToken(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error)
+}
 
-	tok, err := cred.GetToken(ctx, policy.TokenRequestOptions{
+func NewDefaultTokenProvider() (TokenProvider, error) {
+	return azidentity.NewDefaultAzureCredential(nil)
+}
+
+func GetAADAccessToken(ctx context.Context, tp TokenProvider) (AADAccessTokenResponse, error) {
+	tok, err := tp.GetToken(ctx, policy.TokenRequestOptions{
 		Scopes: []string{"https://containerregistry.azure.net/.default"},
 	})
 	if err != nil {
