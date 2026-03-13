@@ -1,16 +1,17 @@
 package token
 
 import (
-	"context"
 	"testing"
 )
 
-// TestGetAADAccessToken_TenantIDFromEnv verifies we read AZURE_TENANT_ID from environment
+// TestGetAADAccessToken_TenantIDFromEnv verifies we read AZURE_TENANT_ID from environment.
+// Requires real Azure credentials so is skipped in short mode.
 func TestGetAADAccessToken_TenantIDFromEnv(t *testing.T) {
+
 	testTenantID := "test-tenant-123"
 	t.Setenv("AZURE_TENANT_ID", testTenantID)
 
-	ctx := context.Background()
+	ctx := t.Context()
 	resp, _ := GetAADAccessToken(ctx)
 
 	if resp.TenantID != testTenantID {
