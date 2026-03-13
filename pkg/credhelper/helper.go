@@ -16,12 +16,12 @@ limitations under the License.
 package credhelper
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
 
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/docker/docker-credential-helpers/credentials"
 	"github.com/spring-financial-group/docker-credential-acr-env/pkg/registry"
 	"github.com/spring-financial-group/docker-credential-acr-env/pkg/token"
@@ -66,14 +66,17 @@ func (a ACRCredHelper) Get(serverURL string) (string, string, error) {
 		return "", "", errors.New("serverURL does not refer to Azure Container Registry")
 	}
 
-	spToken, settings, err := token.GetServicePrincipalTokenFromEnvironment()
+	ctx := context.Background()
+	tok, err := token.GetAADAccessToken(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to acquire sp token %w", err)
+		return "", "", fmt.Errorf("failed to acquire AAD token: %w", err)
 	}
-	refreshToken, err := registry.GetRegistryRefreshTokenFromAADExchange(serverURL, spToken, settings.Values[auth.TenantID])
+
+	refreshToken, err := registry.GetRegistryRefreshTokenFromAADExchange(serverURL, tok.AccessToken, tok.TenantID)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to acquire refresh token %w", err)
+		return "", "", fmt.Errorf("failed to acquire refresh token: %w", err)
 	}
+
 	return tokenUsername, refreshToken, nil
 }
 
