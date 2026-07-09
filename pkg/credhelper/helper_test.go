@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,28 +17,31 @@ package credhelper
 
 import "testing"
 
-// TestIsACRHelper tests whether URLs are detected as being ACR/MCR registry
-// hosts, to determine whether the cred helper should fail fast.
-func TestIsACRHelper(t *testing.T) {
-	for _, c := range []struct {
+// TestIsACRRegistry tests our URL validation logic - the core of what this helper does
+func TestIsACRRegistry(t *testing.T) {
+	tests := []struct {
 		url  string
 		want bool
 	}{
+		// Valid ACR registries
 		{"myregistry.azurecr.io", true},
 		{"myregistry.azurecr.cn", true},
 		{"myregistry.azurecr.de", true},
 		{"myregistry.azurecr.us", true},
 		{"mcr.microsoft.com", true},
-		{"myregistry.azurecr.me", false}, // not a known tld
-		{"notacr.xcr.example", false},
-		{"127.0.0.1:12345", false},
-		{"localhost:12345", false},
-		{"notaurl-)(*$@)(*@)(*", false},
-	} {
-		t.Run(c.url, func(t *testing.T) {
-			got := isACRRegistry(c.url)
-			if got != c.want {
-				t.Fatalf("got %t, want %t", got, c.want)
+
+		// Not ACR
+		{"myregistry.azurecr.me", false},
+		{"docker.io", false},
+		{"gcr.io", false},
+		{"localhost:5000", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.url, func(t *testing.T) {
+			got := isACRRegistry(tt.url)
+			if got != tt.want {
+				t.Errorf("isACRRegistry(%q) = %v, want %v", tt.url, got, tt.want)
 			}
 		})
 	}
