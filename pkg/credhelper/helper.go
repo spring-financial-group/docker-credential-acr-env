@@ -16,12 +16,12 @@ limitations under the License.
 package credhelper
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
 
-	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/docker/docker-credential-helpers/credentials"
 	"github.com/spring-financial-group/docker-credential-acr-env/pkg/registry"
 	"github.com/spring-financial-group/docker-credential-acr-env/pkg/token"
@@ -35,18 +35,15 @@ const (
 )
 
 type ACRCredHelper struct {
+	tokenProvider token.TokenProvider
 }
 
-func NewACRCredentialsHelper() credentials.Helper {
-	return &ACRCredHelper{}
-}
-
-func (a ACRCredHelper) Add(_ *credentials.Credentials) error {
-	return errors.New("list is unimplemented")
-}
-
-func (a ACRCredHelper) Delete(_ string) error {
-	return errors.New("list is unimplemented")
+func NewACRCredentialsHelper() (credentials.Helper, error) {
+	tp, err := token.NewDefaultTokenProvider()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Azure credential: %w", err)
+	}
+	return &ACRCredHelper{tokenProvider: tp}, nil
 }
 
 func isACRRegistry(input string) bool {
@@ -66,15 +63,26 @@ func (a ACRCredHelper) Get(serverURL string) (string, string, error) {
 		return "", "", errors.New("serverURL does not refer to Azure Container Registry")
 	}
 
-	spToken, settings, err := token.GetServicePrincipalTokenFromEnvironment()
+	ctx := context.Background()
+	tok, err := token.GetAADAccessToken(ctx, a.tokenProvider)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to acquire sp token %w", err)
+		return "", "", fmt.Errorf("failed to acquire AAD token: %w", err)
 	}
-	refreshToken, err := registry.GetRegistryRefreshTokenFromAADExchange(serverURL, spToken, settings.Values[auth.TenantID])
+
+	refreshToken, err := registry.GetRegistryRefreshTokenFromAADExchange(serverURL, tok.AccessToken, tok.TenantID)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to acquire refresh token %w", err)
+		return "", "", fmt.Errorf("failed to acquire refresh token: %w", err)
 	}
+
 	return tokenUsername, refreshToken, nil
+}
+
+func (a ACRCredHelper) Add(_ *credentials.Credentials) error {
+	return errors.New("add is unimplemented")
+}
+
+func (a ACRCredHelper) Delete(_ string) error {
+	return errors.New("delete is unimplemented")
 }
 
 func (a ACRCredHelper) List() (map[string]string, error) {

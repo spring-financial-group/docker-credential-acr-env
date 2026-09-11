@@ -16,20 +16,25 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/docker/docker-credential-helpers/credentials"
 	"github.com/spf13/cobra"
 	"github.com/spring-financial-group/docker-credential-acr-env/pkg/credhelper"
 )
 
-// getCmd represents the get command
-var getCmd = &cobra.Command{
-	Use:   "get",
-	Short: "for the server specified via stdin, return the stored credentials via stdout",
-	Run: func(cmd *cobra.Command, args []string) {
-		credentials.Serve(credhelper.NewACRCredentialsHelper())
-	},
-}
-
-func init() {
-	rootCmd.AddCommand(getCmd)
+func newGetCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "get",
+		Short: "for the server specified via stdin, return the stored credentials via stdout",
+		Run: func(cmd *cobra.Command, args []string) {
+			helper, err := credhelper.NewACRCredentialsHelper()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+				os.Exit(1)
+			}
+			credentials.Serve(helper)
+		},
+	}
 }
